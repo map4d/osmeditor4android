@@ -16,7 +16,7 @@ public class FloatPrimitiveList {
     private int     capacity = 0;
 
     /**
-     * Construct a new instance with capacity initial capacity
+     * Construct a new instance with the specified initial capacity
      * 
      * @param capacity initial capacity
      */
@@ -26,7 +26,7 @@ public class FloatPrimitiveList {
     }
 
     /**
-     * COnstruct a new instance with the default initial capacity
+     * Construct a new instance with default initial capacity
      */
     public FloatPrimitiveList() {
         this(12);
