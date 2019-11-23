@@ -2,14 +2,17 @@ package de.blau.android.layer.mapillary;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,27 +28,39 @@ import com.mapbox.geojson.Point;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentActivity;
+import android.text.format.DateUtils;
 import android.util.Log;
 import de.blau.android.App;
 import de.blau.android.Map;
 import de.blau.android.PostAsyncActionHandler;
 import de.blau.android.R;
+import de.blau.android.contract.Paths;
+import de.blau.android.dialogs.PhotoViewerFragment;
 import de.blau.android.layer.ClickableInterface;
 import de.blau.android.layer.DiscardInterface;
 import de.blau.android.layer.ExtentInterface;
 import de.blau.android.layer.MapViewLayer;
+import de.blau.android.layer.photos.Util;
 import de.blau.android.osm.BoundingBox;
+import de.blau.android.osm.OsmParser;
 import de.blau.android.osm.OsmXml;
 import de.blau.android.osm.ViewBox;
+import de.blau.android.photos.Photo;
+import de.blau.android.prefs.Preferences;
 import de.blau.android.resources.DataStyle;
+import de.blau.android.util.ACRAHelper;
+import de.blau.android.util.DateFormatter;
+import de.blau.android.util.FileUtil;
 import de.blau.android.util.GeoJSONConstants;
 import de.blau.android.util.GeoJson;
 import de.blau.android.util.GeoMath;
@@ -61,7 +76,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
-public class MapOverlay extends MapViewLayer implements Serializable, ExtentInterface, DiscardInterface, ClickableInterface<String> {
+public class MapOverlay extends MapViewLayer implements Serializable, ExtentInterface, DiscardInterface, ClickableInterface<MapillaryImage> {
 
     /**
      * 
@@ -146,8 +161,8 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
 
     private static final int SHOW_MARKER_ZOOM = 20;
 
-    private RTree                        data;
-    private RTree                        boxes;
+    private RTree<MapillaryObject>       data;
+    private RTree<MapillaryObject>       boxes;
     private transient Paint              paint;
     private final transient Path         path   = new Path();
     private transient FloatPrimitiveList points = new FloatPrimitiveList();
@@ -192,7 +207,7 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
         int height = map.getHeight();
         int zoomLevel = map.getZoomLevel();
 
-        Collection<BoundedObject> queryResult = new ArrayList<>();
+        Collection<MapillaryObject> queryResult = new ArrayList<>();
         data.query(queryResult, bb);
         Log.d(DEBUG_TAG, "features result count " + queryResult.size());
         for (BoundedObject bo : queryResult) {
@@ -374,17 +389,17 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
      * @return List of photos close to given location.
      */
     @Override
-    public List<String> getClicked(final float x, final float y, final ViewBox viewBox) {
-        List<String> result = new ArrayList<>();
+    public List<MapillaryImage> getClicked(final float x, final float y, final ViewBox viewBox) {
+        List<MapillaryImage> result = new ArrayList<>();
         Log.d(DEBUG_TAG, "getClicked");
         if (data != null) {
             final float tolerance = DataStyle.getCurrent().getNodeToleranceValue();
-            Collection<BoundedObject> queryResult = new ArrayList<>();
+            Collection<MapillaryObject> queryResult = new ArrayList<>();
             data.query(queryResult, viewBox);
             Log.d(DEBUG_TAG, "features result count " + queryResult.size());
             if (queryResult != null) {
-                for (BoundedObject bo : queryResult) {
-                    Feature f = ((MapillaryObject) bo).getFeature();
+                for (MapillaryObject bo : queryResult) {
+                    Feature f = bo.getFeature();
                     Geometry g = f.geometry();
                     if (g == null) {
                         continue;
@@ -397,7 +412,21 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
                         JsonArray imageKeys = coordinateProperties.get("image_keys").getAsJsonArray();
                         for (int i = 0; i < line.size(); i++) {
                             if (inToleranceArea(viewBox, tolerance, line.get(i), x, y)) {
-                                result.add(imageKeys.get(i).getAsString());
+                                MapillaryImage image = new MapillaryImage();
+                                image.index = i;
+                                image.key = imageKeys.get(i).getAsString();
+                                String capturedAt = f.getStringProperty("captured_at");
+                                if (capturedAt != null) {
+                                    System.out.println("Captured at " + capturedAt);
+                                    try {
+                                        image.capturedAt = DateFormatter.getUtcFormat(OsmParser.TIMESTAMP_FORMAT).parse(capturedAt).getTime() / 1000;
+                                    } catch (ParseException e) {
+                                        // TODO Auto-generated catch block
+                                        e.printStackTrace();
+                                    }
+                                }
+                                image.username = f.getStringProperty("username");
+                                result.add(image);
                             }
                         }
                         break;
@@ -433,7 +462,7 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
      * @return a List of Feature objects
      */
     public List<Feature> getFeatures() {
-        Collection<BoundedObject> queryResult = new ArrayList<>();
+        Collection<MapillaryObject> queryResult = new ArrayList<>();
         data.query(queryResult);
         List<Feature> result = new ArrayList<>();
         for (BoundedObject bo : queryResult) {
@@ -444,7 +473,6 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
 
     @Override
     public String getName() {
-
         return "Mapillary"; // map.getContext().getString(R.string.layer_geojson);
     }
 
@@ -456,7 +484,7 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
     @Override
     public BoundingBox getExtent() {
         if (data != null) {
-            Collection<BoundedObject> queryResult = new ArrayList<>();
+            Collection<MapillaryObject> queryResult = new ArrayList<>();
             data.query(queryResult);
             BoundingBox extent = null;
             for (BoundedObject bo : queryResult) {
@@ -493,19 +521,117 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
     }
 
     @Override
-    public void onSelected(FragmentActivity activity, String imageKey) {
-        Uri uri = Uri.parse("https://images.mapillary.com/" + imageKey + "/thumb-2048.jpg");
-        activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+    public void onSelected(FragmentActivity activity, MapillaryImage image) {
+        File outDir;
+        try {
+            outDir = FileUtil.getPublicDirectory();
+            outDir = FileUtil.getPublicDirectory(outDir, "Mapillary");
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return;
+        }
+
+        File imageFile = new File(outDir, image.key +".jpg");
+        if (!imageFile.exists()) { // download
+            new AsyncTask<Void, Void, Void>() {
+                @Override
+                protected Void doInBackground(Void... params) {
+                    Log.d(DEBUG_TAG, "querying server for " + image);
+                    try {
+                        URL url = new URL("https://images.mapillary.com/" + image.key + "/thumb-2048.jpg");
+                        Log.d(DEBUG_TAG, "query: " + url.toString());
+                        ResponseBody responseBody = null;
+                        InputStream inputStream = null;
+
+                        Request request = new Request.Builder().url(url).build();
+                        OkHttpClient client = App.getHttpClient().newBuilder().connectTimeout(20000, TimeUnit.MILLISECONDS)
+                                .readTimeout(20000, TimeUnit.MILLISECONDS).build();
+                        Call mapillaryCall = client.newCall(request);
+                        Response mapillaryCallResponse = mapillaryCall.execute();
+                        if (mapillaryCallResponse.isSuccessful()) {
+                            responseBody = mapillaryCallResponse.body();
+                            inputStream = responseBody.byteStream();
+                        } else {
+
+                        }
+
+                        FileOutputStream fileOutput = new FileOutputStream(imageFile);
+
+                        byte[] buffer = new byte[1024];
+                        int bufferLength = 0;
+                        while ((bufferLength = inputStream.read(buffer)) > 0) {
+                            fileOutput.write(buffer, 0, bufferLength);
+                        }
+                        fileOutput.close();
+                    } catch (Exception ex) {
+                    }
+                    return null;
+                }
+
+                @Override
+                protected void onPostExecute(Void param) {
+                    displayImage(activity, image, imageFile);
+                }
+            }.execute();
+        } else {
+            displayImage(activity, image, imageFile);
+        }
+    }
+
+    /**
+     * @param activity
+     * @param image
+     * @param imageFile
+     */
+    private void displayImage(FragmentActivity activity, MapillaryImage image, File imageFile) {
+        Context context = map.getContext();
+        Resources resources = context.getResources();
+        try {
+            Uri imageUri = Uri.parse(/* FileUtil.FILE_SCHEME_PREFIX + */ imageFile.getAbsolutePath());
+            System.out.println(imageUri.toString());
+            if (imageUri != null) {
+                Preferences prefs = map.getPrefs();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH && prefs.useInternalPhotoViewer()) {
+                    ArrayList<String> uris = new ArrayList<>();
+                    int position = 0;
+                    uris.add(imageUri.toString());
+                    // for (int i = 0; i < photos.size(); i++) {
+                    // Photo p = photos.get(i);
+                    // Uri uri = p.getRefUri(context);
+                    // if (uri != null) {
+                    // uris.add(uri.toString());
+                    // if (photo.equals(p)) {
+                    // position = i;
+                    // }
+                    // } else {
+                    // Log.e(DEBUG_TAG, "Null URI at position " + i);
+                    // }
+                    // }
+                    PhotoViewerFragment.showDialog(activity, uris, position);
+                } else {
+                    Util.startExternalPhotoViewer(context, imageUri);
+                }
+                invalidate();
+            } else {
+                Snack.toastTopError(context, resources.getString(R.string.toast_error_accessing_photo, image.toString()));
+            }
+        } catch (SecurityException ex) {
+            Log.d(DEBUG_TAG, "viewPhoto security exception starting intent: " + ex);
+            Snack.toastTopError(context, resources.getString(R.string.toast_security_error_accessing_photo, image.toString()));
+        } catch (Exception ex) {
+            Log.d(DEBUG_TAG, "viewPhoto exception starting intent: " + ex);
+            ACRAHelper.nocrashReport(ex, "viewPhoto exception starting intent");
+        }
     }
 
     @Override
-    public String getDescription(String s) {
-
-        return s;
+    public String getDescription(MapillaryImage i) {
+        return i.toString();
     }
 
     @Override
-    public String getSelected() {
+    public MapillaryImage getSelected() {
         return null;
     }
 
@@ -515,12 +641,12 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
     }
 
     @Override
-    public void setSelected(String o) {
+    public void setSelected(MapillaryImage o) {
         // not used
     }
 
     /**
-     * Download tasks for a bounding box, actual requests will depend on what the current filter for tasks is set to
+     * Download mapillary data for a bounding box
      * 
      * @param context Android context
      * @param box the bounding box
@@ -529,7 +655,7 @@ public class MapOverlay extends MapViewLayer implements Serializable, ExtentInte
     public void downloadBox(@NonNull final Context context, @NonNull final BoundingBox box, @Nullable final PostAsyncActionHandler handler) {
 
         if (data == null) {
-            data = new RTree(2, 12);
+            data = new RTree<MapillaryObject>(2, 12);
         }
         box.makeValidForApi();
 

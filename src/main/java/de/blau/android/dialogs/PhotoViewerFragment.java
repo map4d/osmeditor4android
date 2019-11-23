@@ -167,7 +167,7 @@ public class PhotoViewerFragment extends ImmersiveDialogFragment implements OnMe
             MenuItem item = menu.add(Menu.NONE, MENUITEM_GOTO, Menu.NONE, R.string.photo_viewer_goto).setIcon(R.drawable.ic_map_white_36dp);
             MenuCompat.setShowAsAction(item, MenuItem.SHOW_AS_ACTION_ALWAYS);
         }
-        if (Uri.parse(photoList.get(startPos)).getAuthority().equals(getString(R.string.content_provider))) {
+        if (getString(R.string.content_provider).equals(Uri.parse(photoList.get(startPos)).getAuthority())) {
             // we can only delete stuff that is provided by our provider
             MenuItem item = menu.add(Menu.NONE, MENUITEM_DELETE, Menu.NONE, R.string.delete).setIcon(R.drawable.ic_delete_forever_white_36dp);
             MenuCompat.setShowAsAction(item, MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -210,7 +210,7 @@ public class PhotoViewerFragment extends ImmersiveDialogFragment implements OnMe
             View itemView = mLayoutInflater.inflate(R.layout.photo_viewer_item, container, false);
 
             SubsamplingScaleImageView view = itemView.findViewById(R.id.photoView);
-            view.setOrientation(SubsamplingScaleImageView.ORIENTATION_90);
+            // view.setOrientation(SubsamplingScaleImageView.ORIENTATION_90);
             view.setImage(ImageSource.uri(photoList.get(position)));
             container.addView(itemView);
 
