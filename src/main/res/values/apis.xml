@@ -7,19 +7,19 @@ non-replaceable functionality in the repo -->
         <item>Development Sandbox</item>
     </string-array>
     <string-array translatable="false" name="api_urls">
-        <item>https://api.openstreetmap.org/</item>
-        <item>https://master.apis.dev.openstreetmap.org/</item>
+        <item>https://its.vimap.vn/</item>
+        <item>https://its.vimap.vn/</item>
     </string-array>
     <string-array translatable="false" name="api_consumer_keys">
-        <item>nmWBEJd7LS0ld8HR4JlAngJeJ8nopMngJSDE8Wx9</item>
-        <item>FeYBebYwwnkCWuMlyddoGeiqegHnW3yGKqJXTnJO</item>
+        <item>TdKdqCf2WgoySndIDcOzQZbMD8mAWK7EinQf8s9K</item>
+        <item>TdKdqCf2WgoySndIDcOzQZbMD8mAWK7EinQf8s9K</item>
     </string-array>
     <string-array translatable="false" name="api_consumer_secrets">
-        <item>KXtzsmxYtuZAjfkMuvPgRQXxMbKdDPHPcf2sX4mD</item>
-        <item>Mtngq8q1fTWp06Fzw4Aq2QRI6V16EOeNJVrOEHvu</item>
+        <item>xNuBGhlaJpeTJjOAfrDToNydo85VyYEncTA4RrQT</item>
+        <item>xNuBGhlaJpeTJjOAfrDToNydo85VyYEncTA4RrQT</item>
     </string-array>
     <string-array translatable="false" name="api_oauth_urls">
-        <item>https://www.openstreetmap.org/</item>
-        <item>https://master.apis.dev.openstreetmap.org/</item>
+        <item>https://its.vimap.vn/</item>
+        <item>https://its.vimap.vn/</item>
     </string-array>
 </resources>

@@ -28,20 +28,20 @@
                 "attribution": {
                     "required": true,
                     "text": "\u00a9 OpenStreetMap contributors, CC-BY-SA 2.0",
-                    "url": "https://www.openstreetmap.org"
+                    "url": "https://vimap.vn"
                 },
                 "default": true,
-                "description": "The default OpenStreetMap layer.",
+                "description": "Map4d Default.",
                 "i18n": true,
                 "icon": "https://osmlab.github.io/editor-layer-index/sources/world/OpenStreetMap-GPS.png",
                 "id": "MAPNIK",
                 "max_zoom": 19,
-                "name": "OpenStreetMap (Standard)",
+                "name": "Map4d (Standard)",
                 "type": "tms",
                 "category": "osmbasedmap",
-                "url": "https://{switch:a,b,c}.tile.openstreetmap.org/{zoom}/{x}/{y}.png",
-                "license_url": "https://wiki.osmfoundation.org/wiki/Terms_of_Use",
-                "privacy_policy_url": "https://wiki.osmfoundation.org/wiki/Privacy_Policy"
+                "url": "http://rtile.map4d.vn/all/2d/{zoom}/{x}/{y}.png",
+                "license_url": "https://map4d.vn",
+                "privacy_policy_url": "https://map4d.vn"
             },
             "type": "Feature"
         },
